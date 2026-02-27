@@ -1,0 +1,13 @@
+import { Request, Response } from "express";
+declare class UserService {
+    private userModel;
+    constructor();
+    profile: (req: Request, res: Response) => Promise<Response>;
+    profileImage: (req: Request, res: Response) => Promise<Response>;
+    profileCoverImage: (req: Request, res: Response) => Promise<Response>;
+    logout: (req: Request, res: Response) => Promise<Response>;
+    refreshToken: (req: Request, res: Response) => Promise<Response>;
+}
+declare const _default: UserService;
+export default _default;
+//# sourceMappingURL=user.service.d.ts.map

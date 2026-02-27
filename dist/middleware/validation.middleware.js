@@ -42,9 +42,11 @@ exports.generalFields = {
     email: zod_1.z.email({
         error: "valid email must be like to example@domain.com",
     }),
+    otp: zod_1.z.string().regex(/^\d{6}$/),
     password: zod_1.z
         .string()
         .regex(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[a-zA-Z]).{8,}$/, {}),
-    confirmPassword: zod_1.z.string()
+    confirmPassword: zod_1.z.string(),
+    phone: zod_1.z.string().optional()
 };
 //# sourceMappingURL=validation.middleware.js.map

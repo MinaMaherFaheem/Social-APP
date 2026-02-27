@@ -34,11 +34,17 @@ export interface IUser {
   phone?: string;
   address?: string;
   profileImage?: string;
+  temProfileImage?: string;
   coverImages?: string[];
 
   gender: GenderEnum;
   role: RoleEnum;
   provider: ProviderEnum;
+
+  freezedAt?: Date;
+  freezedBy?: Types.ObjectId;
+  restoredAt?: Date;
+  restoredBy?: Types.ObjectId;
 
   createdAt: Date;
   updatedAt?: Date;
@@ -83,7 +89,7 @@ const userSchema = new Schema<IUser>(
     },
     changeCredentialsTime: {
       type: Date,
-      required: true,
+      required: false
     },
 
     phone: {
@@ -94,6 +100,9 @@ const userSchema = new Schema<IUser>(
     },
 
     profileImage: {
+      type: String
+    },
+    temProfileImage: {
       type: String
     },
     coverImages: [
@@ -114,6 +123,11 @@ const userSchema = new Schema<IUser>(
       enum: ProviderEnum,
       default: ProviderEnum.SYSTEM,
     },
+
+    freezedAt: Date,
+    freezedBy: {type: Schema.Types.ObjectId , ref: "User"},
+    restoredAt: Date,
+    restoredBy: {type: Schema.Types.ObjectId , ref: "User"},
 
   },
   {

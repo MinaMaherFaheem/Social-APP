@@ -1,18 +1,31 @@
 import type { Request, Response } from "express";
-import type { ISignupBodyInputDTO, IConfirmEmailBodyInputDTO, ILoginBodyInputDTO, IGmail, IForgotCodeBodyInputDTO, IVerifyForgotPasswordBodyInputDTO, IResetForgotPasswordBodyInputDTO } from "./auth.dto";
+import type {
+  ISignupBodyInputDTO,
+  IConfirmEmailBodyInputDTO,
+  ILoginBodyInputDTO,
+  IGmail,
+  IForgotCodeBodyInputDTO,
+  IVerifyForgotPasswordBodyInputDTO,
+  IResetForgotPasswordBodyInputDTO,
+} from "./auth.dto";
 import { ProviderEnum, UserModel } from "../../models/user.model";
 import { UserRepository } from "../../DB/repository/user.repository";
-import { BadRequestException, ConflictException, NotFoundException } from "../../utils/response/error.reponse";
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from "../../utils/response/error.reponse";
 import { compareHash, generateHash } from "../../utils/security/hash.security";
-import { emailEvent } from "../../utils/event/email.event";
+import { emailEvent } from "../../utils/email/email.event";
 import { createLoginCredentials } from "../../utils/security/token.security";
 import { OAuth2Client, type TokenPayload } from "google-auth-library";
-import { generateNumberOtp } from '../../utils/otp';
-
+import { generateNumberOtp } from "../../utils/otp";
+import { successResponse } from "../../utils/response/success.response";
+import { ILoginResponse } from "./auth.entities";
 
 class AuthenticationService {
-  private userModel = new UserRepository(UserModel)
-  constructor() { }
+  private userModel = new UserRepository(UserModel);
+  constructor() {}
 
   private async verifyGmailAccount(idToken: string): Promise<TokenPayload> {
     const client = new OAuth2Client();
@@ -27,8 +40,7 @@ class AuthenticationService {
     }
 
     return payload;
-  };
-
+  }
 
   signupWithGmail = async (req: Request, res: Response): Promise<Response> => {
     const { idToken }: IGmail = req.body;
@@ -45,28 +57,33 @@ class AuthenticationService {
       if (user.provider == ProviderEnum.GOOGLE) {
         return await this.loginWithGmail(req, res);
       }
-      throw new ConflictException('Email exist with another provider :: ' + user.provider);
+      throw new ConflictException(
+        "Email exist with another provider :: " + user.provider,
+      );
     }
 
-    const [newUser] = await this.userModel.create({
-      data: [
-        {
-          firstName: given_name as string,
-          lastName: family_name as string,
-          email: email as string,
-          profileImage: picture as string,
-          confirmedAt: new Date(),
-        },
-      ],
-    }) || [];
+    const [newUser] =
+      (await this.userModel.create({
+        data: [
+          {
+            firstName: given_name as string,
+            lastName: family_name as string,
+            email: email as string,
+            profileImage: picture as string,
+            confirmedAt: new Date(),
+          },
+        ],
+      })) || [];
 
     if (!newUser) {
-      throw new BadRequestException("Fail to signup with gmail please try again later");
-    };
+      throw new BadRequestException(
+        "Fail to signup with gmail please try again later",
+      );
+    }
 
     const credentials = await createLoginCredentials(newUser);
 
-    return res.status(201).json({ message: "Done", data: { credentials } });
+    return successResponse<ILoginResponse>({ res,  statusCode:201, data: { credentials } });
   };
 
   loginWithGmail = async (req: Request, res: Response): Promise<Response> => {
@@ -76,22 +93,22 @@ class AuthenticationService {
     const user = await this.userModel.findOne({
       filter: {
         email,
-        provider: ProviderEnum.GOOGLE
+        provider: ProviderEnum.GOOGLE,
       },
     });
 
     if (!user) {
-      throw new NotFoundException("Not register account or registered with anther provider");
+      throw new NotFoundException(
+        "Not register account or registered with anther provider",
+      );
     }
 
     const credentials = await createLoginCredentials(user);
 
-    return res.json({ message: "Done", data: { credentials } });
+    return successResponse<ILoginResponse>({ res, data: { credentials } });
   };
 
-
   signup = async (req: Request, res: Response): Promise<Response> => {
-
     let { username, email, password }: ISignupBodyInputDTO = req.body;
     console.log({ username, email, password });
 
@@ -100,29 +117,30 @@ class AuthenticationService {
       select: "email",
       options: {
         lean: false,
-      }
+      },
     });
 
-    console.log({ checkUserExist });
     if (checkUserExist) {
       throw new ConflictException("Email exist");
     }
 
     const otp = generateNumberOtp();
 
-    const user = await this.userModel.createUser({
-      data: [{
-        username,
-        email,
-        password: await generateHash(password),
-        confirmEmailOtp: await generateHash(String(otp))
-      }]
-      });
+    await this.userModel.createUser({
+      data: [
+        {
+          username,
+          email,
+          password: await generateHash(password),
+          confirmEmailOtp: await generateHash(String(otp)),
+        },
+      ],
+    });
 
-    emailEvent.emit("confirmEmail", {to:email,otp});
+    emailEvent.emit("confirmEmail", { to: email, otp });
 
-    return res.status(201).json({ message: "Done", data: { user } });
-  }
+    return successResponse({ res, statusCode: 201 });
+  };
 
   confirmEmail = async (req: Request, res: Response): Promise<Response> => {
     const { email, otp }: IConfirmEmailBodyInputDTO = req.body;
@@ -136,7 +154,7 @@ class AuthenticationService {
     });
 
     if (!user) {
-      throw new NotFoundException("Invalid account")
+      throw new NotFoundException("Invalid account");
     }
 
     if (!(await compareHash(otp, user.confirmEmailOtp as string))) {
@@ -145,18 +163,18 @@ class AuthenticationService {
 
     await this.userModel.updateOne({
       filter: {
-        email
+        email,
       },
       update: {
         confirmedAt: new Date(),
         $unset: {
-          confirmEmailOtp: 1
-        }
-      }
-    })
+          confirmEmailOtp: 1,
+        },
+      },
+    });
 
-    return res.json({ message: "Done", data: req.body });
-  }
+    return successResponse({ res });
+  };
 
   login = async (req: Request, res: Response): Promise<Response> => {
     const { email, password }: ILoginBodyInputDTO = req.body;
@@ -179,12 +197,8 @@ class AuthenticationService {
 
     const credentials = await createLoginCredentials(user);
 
-    return res.json({
-      message: "Done",
-      data: { credentials },
-    });
-  }
-
+    return successResponse<ILoginResponse>({ res, data: { credentials } });
+  };
 
   sendForgotCode = async (req: Request, res: Response): Promise<Response> => {
     const { email }: IForgotCodeBodyInputDTO = req.body;
@@ -193,12 +207,14 @@ class AuthenticationService {
       filter: {
         email,
         provider: ProviderEnum.SYSTEM,
-        confirmedAt: { $exists: true }
+        confirmedAt: { $exists: true },
       },
     });
 
     if (!user) {
-      throw new NotFoundException("invalid account due to one of the following reasons [not register , invalid provider , not confirmed account]");
+      throw new NotFoundException(
+        "invalid account due to one of the following reasons [not register , invalid provider , not confirmed account]",
+      );
     }
 
     const otp = generateNumberOtp();
@@ -211,56 +227,66 @@ class AuthenticationService {
 
     if (!result.matchedCount) {
       throw new BadRequestException(
-        "Fail to send the reset code please try again later"
+        "Fail to send the reset code please try again later",
       );
-    };
+    }
 
     emailEvent.emit("resetPassword", { to: email, otp });
     return res.json({
-      message: "Done"
+      message: "Done",
     });
-  }
+  };
 
-  verifyForgotPassword = async (req: Request, res: Response): Promise<Response> => {
+  verifyForgotPassword = async (
+    req: Request,
+    res: Response,
+  ): Promise<Response> => {
     const { email, otp }: IVerifyForgotPasswordBodyInputDTO = req.body;
 
     const user = await this.userModel.findOne({
       filter: {
         email,
         provider: ProviderEnum.SYSTEM,
-        resetPasswordOtp: { $exists: true }
+        resetPasswordOtp: { $exists: true },
       },
     });
 
     if (!user) {
-      throw new NotFoundException("invalid account due to one of the following reasons [not register , invalid provider , not confirmed account , missing resetPasswordOtp]");
+      throw new NotFoundException(
+        "invalid account due to one of the following reasons [not register , invalid provider , not confirmed account , missing resetPasswordOtp]",
+      );
     }
 
-    if (!await compareHash(otp, user.resetPasswordOtp as string)) {
+    if (!(await compareHash(otp, user.resetPasswordOtp as string))) {
       throw new ConflictException("Invalid otp");
     }
 
     return res.json({
-      message: "Done"
+      message: "Done",
     });
-  }
+  };
 
-  resetForgotPassword = async (req: Request, res: Response): Promise<Response> => {
+  resetForgotPassword = async (
+    req: Request,
+    res: Response,
+  ): Promise<Response> => {
     const { email, otp, password }: IResetForgotPasswordBodyInputDTO = req.body;
 
     const user = await this.userModel.findOne({
       filter: {
         email,
         provider: ProviderEnum.SYSTEM,
-        resetPasswordOtp: { $exists: true }
+        resetPasswordOtp: { $exists: true },
       },
     });
 
     if (!user) {
-      throw new NotFoundException("invalid account due to one of the following reasons [not register , invalid provider , not confirmed account , missing resetPasswordOtp]");
+      throw new NotFoundException(
+        "invalid account due to one of the following reasons [not register , invalid provider , not confirmed account , missing resetPasswordOtp]",
+      );
     }
 
-    if (!await compareHash(otp, user.resetPasswordOtp as string)) {
+    if (!(await compareHash(otp, user.resetPasswordOtp as string))) {
       throw new ConflictException("Invalid otp");
     }
 
@@ -269,21 +295,18 @@ class AuthenticationService {
       update: {
         password: await generateHash(password),
         changeCredentialsTime: new Date(),
-        $unset: { resetPasswordOtp: 1 }
+        $unset: { resetPasswordOtp: 1 },
       },
     });
 
     if (!result.matchedCount) {
-      throw new BadRequestException(
-        "Fail to reset account password"
-      );
-    };
+      throw new BadRequestException("Fail to reset account password");
+    }
 
     return res.json({
-      message: "Done"
+      message: "Done",
     });
-  }
-
+  };
 }
 
-export default new AuthenticationService()
+export default new AuthenticationService();

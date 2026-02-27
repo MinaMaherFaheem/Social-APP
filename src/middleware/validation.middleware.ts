@@ -60,9 +60,10 @@ export const generalFields = {
   email: z.email({
     error: "valid email must be like to example@domain.com",
   }),
-  otp: z.string().regex(/^\d{}$/),
+  otp: z.string().regex(/^\d{6}$/),
   password: z
     .string()
     .regex(/(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[a-zA-Z]).{8,}$/, {}),
-  confirmPassword: z.string()
+  confirmPassword: z.string(),
+  phone: z.string().optional()
 }

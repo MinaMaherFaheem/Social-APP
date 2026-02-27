@@ -1,11 +1,11 @@
 import { v4 as uuid } from 'uuid';
-import type { JwtPayload, Secret, SignOptions } from "jsonwebtoken";
 import { sign, verify } from "jsonwebtoken";
+import type { JwtPayload, Secret, SignOptions } from "jsonwebtoken";
 import { HUserDocument, RoleEnum, UserModel } from "../../models/user.model";
 import { BadRequestException, UnauthorizedException } from "../response/error.reponse";
 import { UserRepository } from "../../DB/repository/user.repository";
 import { TokenRepository } from '../../DB/repository/token.repository';
-import { TokenModel } from '../../models/token.model';
+import { HTokenDocument, TokenModel } from '../../models/token.model';
 
 
 export enum SignatureLevelEnum {

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RoleEnum = exports.GenderEnum = void 0;
+exports.UserModel = exports.ProviderEnum = exports.RoleEnum = exports.GenderEnum = void 0;
 const mongoose_1 = require("mongoose");
 var GenderEnum;
 (function (GenderEnum) {
@@ -12,12 +12,87 @@ var RoleEnum;
     RoleEnum["user"] = "user";
     RoleEnum["admin"] = "admin";
 })(RoleEnum || (exports.RoleEnum = RoleEnum = {}));
+var ProviderEnum;
+(function (ProviderEnum) {
+    ProviderEnum["GOOGLE"] = "GOOGLE";
+    ProviderEnum["SYSTEM"] = "SYSTEM";
+})(ProviderEnum || (exports.ProviderEnum = ProviderEnum = {}));
 const userSchema = new mongoose_1.Schema({
-    username: { type: String, required: true, min: 2, max: 20 },
-    email: { type: String, required: true, unique: true, lowercase: true },
-    password: { type: String, required: true },
-    confirmed: { type: Boolean, default: false },
-}, { timestamps: true });
-const userModel = (0, mongoose_1.model)("User", userSchema);
-exports.default = userModel;
+    firstName: {
+        type: String,
+        required: true,
+        minLength: 2,
+        maxLength: 25,
+    },
+    lastName: {
+        type: String,
+        required: true,
+        minLength: 2,
+        maxLength: 25,
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+    },
+    confirmEmailOtp: {
+        type: String,
+    },
+    confirmedAt: {
+        type: Date,
+    },
+    password: {
+        type: String,
+        required: function () {
+            return this.provider === ProviderEnum.GOOGLE ? false : true;
+        },
+    },
+    resetPasswordOtp: {
+        type: String,
+    },
+    changeCredentialsTime: {
+        type: Date,
+        required: false
+    },
+    phone: {
+        type: String,
+    },
+    address: {
+        type: String,
+    },
+    profileImage: {
+        type: String
+    },
+    coverImages: [
+        String
+    ],
+    gender: {
+        type: String,
+        enum: GenderEnum,
+        default: GenderEnum.male,
+    },
+    role: {
+        type: String,
+        enum: RoleEnum,
+        default: RoleEnum.user,
+    },
+    provider: {
+        type: String,
+        enum: ProviderEnum,
+        default: ProviderEnum.SYSTEM,
+    },
+}, {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+});
+userSchema.virtual("username")
+    .set(function (value) {
+    const [firstName, lastName] = value.split(" ") || [];
+    this.set({ firstName, lastName });
+})
+    .get(function () {
+    return this.firstName + " " + this.lastName;
+});
+exports.UserModel = (0, mongoose_1.model)("User", userSchema);
 //# sourceMappingURL=user.model.js.map

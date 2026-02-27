@@ -27,7 +27,7 @@ router.post("/login-gmail",
 
 
 router.post("/login",
-  validation(validators.signup),
+  validation(validators.login),
   authService.login
 );
 

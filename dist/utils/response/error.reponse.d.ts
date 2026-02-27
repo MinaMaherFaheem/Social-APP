@@ -12,5 +12,14 @@ export declare class BadRequestException extends ApplicationException {
 export declare class NotFoundException extends ApplicationException {
     constructor(message: string, cause?: unknown);
 }
+export declare class UnauthorizedException extends ApplicationException {
+    constructor(message: string, cause?: unknown);
+}
+export declare class ForbiddenException extends ApplicationException {
+    constructor(message: string, cause?: unknown);
+}
+export declare class ConflictException extends ApplicationException {
+    constructor(message: string, cause?: unknown);
+}
 export declare const globalErrorHandlind: (error: IError, req: Request, res: Response, next: NextFunction) => Response<any, Record<string, any>>;
 //# sourceMappingURL=error.reponse.d.ts.map

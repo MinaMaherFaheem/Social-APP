@@ -7,8 +7,10 @@ export declare const validation: (schema: SchemaType) => (req: Request, res: Res
 export declare const generalFields: {
     username: z.ZodString;
     email: z.ZodEmail;
+    otp: z.ZodString;
     password: z.ZodString;
     confirmPassword: z.ZodString;
+    phone: z.ZodOptional<z.ZodString>;
 };
 export {};
 //# sourceMappingURL=validation.middleware.d.ts.map

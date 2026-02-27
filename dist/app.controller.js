@@ -11,6 +11,7 @@ const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const express_rate_limit_1 = require("express-rate-limit");
 const auth_controller_1 = __importDefault(require("./modules/auth/auth.controller"));
+const user_controller_1 = __importDefault(require("./modules/user/user.controller"));
 const error_reponse_1 = require("./utils/response/error.reponse");
 const connection_database_1 = __importDefault(require("./DB/connection.database"));
 const limiter = (0, express_rate_limit_1.rateLimit)({
@@ -30,6 +31,7 @@ const bootstarp = async () => {
         res.json({ message: `welcome to ${process.env.APPLICATION_NAME} backend landing page 💖🍀` });
     });
     app.use("/auth", auth_controller_1.default);
+    app.use("/user", user_controller_1.default);
     app.use("{/*dummy}", (req, res) => {
         return res.status(404).json({ message: "In-valid application routing please check the method and url ❌" });
     });

@@ -1,12 +1,11 @@
 import { EventEmitter } from "node:events";
 import Mail from "nodemailer/lib/mailer";
-import { verifyEmail } from "../email/verify.template.email";
-import { sendEmail } from "../email/send.email";
-
+import { verifyEmail } from "./verify.template.email";
+import { sendEmail } from "./send.email";
 
 export const emailEvent = new EventEmitter();
 
-interface IEmail extends Mail.Options{
+interface IEmail extends Mail.Options {
   otp: number;
 }
 

@@ -1,3 +1,4 @@
+import { DeleteResult, Types } from "mongoose";
 import { ProjectionType, RootFilterQuery, CreateOptions, HydratedDocument, Model, QueryOptions, FlattenMaps, UpdateQuery, MongooseUpdateQueryOptions, UpdateWriteOpResult } from "mongoose";
 
 export type Lean<T> = HydratedDocument<FlattenMaps<T>>
@@ -32,7 +33,7 @@ export abstract class DatabaseRepository<TDocument> {
   }: {
     data: Partial<TDocument>[];
     options?: CreateOptions;
-  }): Promise<HydratedDocument<TDocument>[] | undefined> {
+  }): Promise<HydratedDocument<TDocument>[]> {
     return await this.model.create(data, options);
   }
 
@@ -54,6 +55,35 @@ export abstract class DatabaseRepository<TDocument> {
       },
       options
     );
+  }
+
+  async findByIdAndUpdate({
+    id,
+    update,
+    options,
+  }: {
+    id: Types.ObjectId;
+    update?: UpdateQuery<TDocument>;
+    options?: QueryOptions<TDocument> | null
+    }
+  ): Promise<HydratedDocument<TDocument> | Lean<TDocument> | null> {
+  return this.model.findByIdAndUpdate(
+      id,
+      {
+        ...update,
+        $inc: { __v: 1 },
+      },
+      options
+    );
+  }
+
+  async deleteOne({
+    filter,
+  }: {
+    filter: RootFilterQuery<TDocument>;
+    }
+  ): Promise<DeleteResult> {
+    return await this.model.deleteOne(filter);
   }
 
 }
