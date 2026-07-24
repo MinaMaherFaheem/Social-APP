@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserModel = exports.ProviderEnum = exports.RoleEnum = exports.GenderEnum = void 0;
 const mongoose_1 = require("mongoose");
+const hash_security_1 = require("../utils/security/hash.security");
 var GenderEnum;
 (function (GenderEnum) {
     GenderEnum["male"] = "male";
@@ -11,6 +12,7 @@ var RoleEnum;
 (function (RoleEnum) {
     RoleEnum["user"] = "user";
     RoleEnum["admin"] = "admin";
+    RoleEnum["superAdmin"] = "super-admin";
 })(RoleEnum || (exports.RoleEnum = RoleEnum = {}));
 var ProviderEnum;
 (function (ProviderEnum) {
@@ -63,6 +65,9 @@ const userSchema = new mongoose_1.Schema({
     profileImage: {
         type: String
     },
+    temProfileImage: {
+        type: String
+    },
     coverImages: [
         String
     ],
@@ -81,6 +86,11 @@ const userSchema = new mongoose_1.Schema({
         enum: ProviderEnum,
         default: ProviderEnum.SYSTEM,
     },
+    freezedAt: Date,
+    freezedBy: { type: mongoose_1.Schema.Types.ObjectId, ref: "User" },
+    restoredAt: Date,
+    restoredBy: { type: mongoose_1.Schema.Types.ObjectId, ref: "User" },
+    friends: [{ type: mongoose_1.Schema.Types.ObjectId, ref: "User" }],
 }, {
     timestamps: true,
     toJSON: { virtuals: true },
@@ -89,10 +99,31 @@ const userSchema = new mongoose_1.Schema({
 userSchema.virtual("username")
     .set(function (value) {
     const [firstName, lastName] = value.split(" ") || [];
-    this.set({ firstName, lastName });
+    this.set({ firstName, lastName, slug: value.replaceAll(/\s+/g, "-") });
 })
     .get(function () {
     return this.firstName + " " + this.lastName;
+});
+userSchema.pre("save", async function (next) {
+    this.wasNew = this.isNew;
+    if (this.isModified("password")) {
+        this.password = await (0, hash_security_1.generateHash)(this.password);
+    }
+    if (this.isModified("confirmEmailOtp")) {
+        this.confirmEmailPlainOtp = this.confirmEmailOtp;
+        this.confirmEmailOtp = await (0, hash_security_1.generateHash)(this.confirmEmailOtp);
+    }
+    next();
+});
+userSchema.pre(["find", "findOne"], function (next) {
+    const query = this.getQuery();
+    if (query.paranoid === false) {
+        this.setQuery({ ...query });
+    }
+    else {
+        this.setQuery({ ...query, freezedAt: { $exists: false } });
+    }
+    next();
 });
 exports.UserModel = (0, mongoose_1.model)("User", userSchema);
 //# sourceMappingURL=user.model.js.map

@@ -1,4 +1,5 @@
 import { Types, Schema, model, HydratedDocument } from "mongoose";
+import { generateHash } from "../utils/security/hash.security";
 
 export enum GenderEnum {
   male = "male",
@@ -7,7 +8,8 @@ export enum GenderEnum {
 
 export enum RoleEnum {
   user = "user",
-  admin = "admin"
+  admin = "admin",
+  superAdmin = "super-admin"
 }
 
 export enum ProviderEnum {
@@ -43,8 +45,10 @@ export interface IUser {
 
   freezedAt?: Date;
   freezedBy?: Types.ObjectId;
+
   restoredAt?: Date;
   restoredBy?: Types.ObjectId;
+  friends?:Types.ObjectId[]; 
 
   createdAt: Date;
   updatedAt?: Date;
@@ -128,6 +132,7 @@ const userSchema = new Schema<IUser>(
     freezedBy: {type: Schema.Types.ObjectId , ref: "User"},
     restoredAt: Date,
     restoredBy: {type: Schema.Types.ObjectId , ref: "User"},
+    friends: [{type: Schema.Types.ObjectId , ref: "User"}],
 
   },
   {
@@ -140,11 +145,40 @@ const userSchema = new Schema<IUser>(
 userSchema.virtual("username")
   .set(function (value: string) {
     const [firstName, lastName] = value.split(" ") || [];
-    this.set({ firstName, lastName });
+    this.set({ firstName, lastName, slug: value.replaceAll(/\s+/g, "-") });
   })
   .get(function () {
     return this.firstName + " " + this.lastName;
   });
+
+
+userSchema.pre(
+  "save",
+  async function (
+    this: HUserDocument & { wasNew: boolean; confirmEmailPlainOtp?: string },
+    next
+  ) {
+    this.wasNew = this.isNew;
+    if (this.isModified("password")) {
+      this.password = await generateHash(this.password);
+    }
+    if (this.isModified("confirmEmailOtp")) {
+      this.confirmEmailPlainOtp = this.confirmEmailOtp as string;
+      this.confirmEmailOtp = await generateHash(this.confirmEmailOtp as string);
+    }
+    next();
+  }
+);
+
+userSchema.pre(["find","findOne"], function (next) {
+  const query = this.getQuery();
+  if (query.paranoid === false) {
+    this.setQuery({...query});
+  } else {
+    this.setQuery({...query, freezedAt: {$exists: false}});
+  }
+  next();
+});
 
 
 export const UserModel = model<IUser>("User", userSchema);

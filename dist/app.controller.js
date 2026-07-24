@@ -10,10 +10,14 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const express_rate_limit_1 = require("express-rate-limit");
-const auth_controller_1 = __importDefault(require("./modules/auth/auth.controller"));
-const user_controller_1 = __importDefault(require("./modules/user/user.controller"));
+const modules_1 = require("./modules");
 const error_reponse_1 = require("./utils/response/error.reponse");
 const connection_database_1 = __importDefault(require("./DB/connection.database"));
+const node_util_1 = require("node:util");
+const node_stream_1 = require("node:stream");
+const s3_config_1 = require("./utils/multer/s3.config");
+const chat_1 = require("./modules/chat");
+const createS3WriteStreamPipe = (0, node_util_1.promisify)(node_stream_1.pipeline);
 const limiter = (0, express_rate_limit_1.rateLimit)({
     windowMs: 60 * 60000,
     limit: 2000,
@@ -30,16 +34,43 @@ const bootstarp = async () => {
     app.get("/", (req, res) => {
         res.json({ message: `welcome to ${process.env.APPLICATION_NAME} backend landing page 💖🍀` });
     });
-    app.use("/auth", auth_controller_1.default);
-    app.use("/user", user_controller_1.default);
+    app.use("/auth", modules_1.authRouter);
+    app.use("/user", modules_1.userRouter);
+    app.use("/post", modules_1.postRouter);
+    app.use("/chat", chat_1.chatRouter);
+    app.all("/graphql", createHandlar({ schema: schema }));
+    app.get("/upload/*path", async (req, res) => {
+        const { downloadName, download = "false" } = req.query;
+        const { path } = req.params;
+        const Key = path.join("/");
+        const s3Responce = await (0, s3_config_1.getFile)({ Key });
+        console.log(s3Responce.Body);
+        if (!s3Responce?.Body) {
+            throw new error_reponse_1.BadRequestException("fail to fetch this asset");
+        }
+        res.set("Corss-Origin-Resource-Policy", "corss-origin");
+        res.setHeader("Content-type", `${s3Responce.ContentType || "application/octet-stream"}`);
+        if (download === "true") {
+            res.setHeader("Content-Disposition", `attachment; filename="${downloadName || Key.split("/").pop()}"`);
+        }
+        return await createS3WriteStreamPipe(s3Responce.Body, res);
+    });
+    app.get("/upload/pre-signed/*path", async (req, res) => {
+        const { downloadName, download = "false", expiresIn = 120 } = req.query;
+        const { path } = req.params;
+        const Key = path.join("/");
+        const url = await (0, s3_config_1.createGetPresignedLink)({ Key, downloadName: downloadName, download, expiresIn });
+        return res.json({ message: "Done", data: { url } });
+    });
     app.use("{/*dummy}", (req, res) => {
         return res.status(404).json({ message: "In-valid application routing please check the method and url ❌" });
     });
     app.use(error_reponse_1.globalErrorHandlind);
     await (0, connection_database_1.default)();
-    app.listen(port, () => {
+    const httpServer = app.listen(port, () => {
         console.log(`Server is running on port :::${port}`);
     });
+    (0, modules_1.initio)(httpServer);
 };
 exports.default = bootstarp;
 //# sourceMappingURL=app.controller.js.map

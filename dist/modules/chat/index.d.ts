@@ -1,0 +1,3 @@
+export * from "./chat.geteway";
+export { default as chatRouter } from "./chat.controller";
+//# sourceMappingURL=index.d.ts.map

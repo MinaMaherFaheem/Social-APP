@@ -3,8 +3,7 @@ import { sign, verify } from "jsonwebtoken";
 import type { JwtPayload, Secret, SignOptions } from "jsonwebtoken";
 import { HUserDocument, RoleEnum, UserModel } from "../../models/user.model";
 import { BadRequestException, UnauthorizedException } from "../response/error.reponse";
-import { UserRepository } from "../../DB/repository/user.repository";
-import { TokenRepository } from '../../DB/repository/token.repository';
+import { UserRepository, TokenRepository } from "../../DB/repository";
 import { HTokenDocument, TokenModel } from '../../models/token.model';
 
 
@@ -51,6 +50,7 @@ export const detectSignatureLevel = async (role: RoleEnum = RoleEnum.user): Prom
 
     switch (role) {
         case RoleEnum.admin:
+        case RoleEnum.superAdmin:
             signatureLevel = SignatureLevelEnum.System;
             break;
         default:

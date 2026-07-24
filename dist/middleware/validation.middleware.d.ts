@@ -11,6 +11,18 @@ export declare const generalFields: {
     password: z.ZodString;
     confirmPassword: z.ZodString;
     phone: z.ZodOptional<z.ZodString>;
+    file: (mimetype: string[]) => z.ZodObject<{
+        fieldname: z.ZodString;
+        originalname: z.ZodString;
+        encoding: z.ZodString;
+        mimetype: z.ZodEnum<{
+            [x: string]: string;
+        }>;
+        buffer: z.ZodOptional<z.ZodAny>;
+        path: z.ZodOptional<z.ZodString>;
+        size: z.ZodNumber;
+    }, z.core.$strict>;
+    id: z.ZodString;
 };
 export {};
 //# sourceMappingURL=validation.middleware.d.ts.map

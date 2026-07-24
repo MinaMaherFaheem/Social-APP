@@ -9,7 +9,6 @@ import type {
   IResetForgotPasswordBodyInputDTO,
 } from "./auth.dto";
 import { ProviderEnum, UserModel } from "../../models/user.model";
-import { UserRepository } from "../../DB/repository/user.repository";
 import {
   BadRequestException,
   ConflictException,
@@ -22,6 +21,7 @@ import { OAuth2Client, type TokenPayload } from "google-auth-library";
 import { generateNumberOtp } from "../../utils/otp";
 import { successResponse } from "../../utils/response/success.response";
 import { ILoginResponse } from "./auth.entities";
+import { UserRepository } from "../../DB/repository";
 
 class AuthenticationService {
   private userModel = new UserRepository(UserModel);

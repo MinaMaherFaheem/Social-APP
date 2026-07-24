@@ -5,7 +5,8 @@ export declare enum GenderEnum {
 }
 export declare enum RoleEnum {
     user = "user",
-    admin = "admin"
+    admin = "admin",
+    superAdmin = "super-admin"
 }
 export declare enum ProviderEnum {
     GOOGLE = "GOOGLE",
@@ -25,10 +26,16 @@ export interface IUser {
     phone?: string;
     address?: string;
     profileImage?: string;
+    temProfileImage?: string;
     coverImages?: string[];
     gender: GenderEnum;
     role: RoleEnum;
     provider: ProviderEnum;
+    freezedAt?: Date;
+    freezedBy?: Types.ObjectId;
+    restoredAt?: Date;
+    restoredBy?: Types.ObjectId;
+    friends?: Types.ObjectId[];
     createdAt: Date;
     updatedAt?: Date;
 }

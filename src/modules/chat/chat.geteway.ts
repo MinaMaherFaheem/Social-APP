@@ -1,0 +1,24 @@
+import { ChatEvents } from './chat.events';
+import { IAuthSocket } from '../geteway';
+import { Server } from "socket.io"
+
+
+
+export class ChatGeteway {
+    private chatEvents : ChatEvents;
+    constructor() {
+        this.chatEvents = new ChatEvents();
+    };
+
+    register = (socket:IAuthSocket, io: Server) => {
+        try {
+            this.chatEvents.sayHi(socket, io)
+            this.chatEvents.sendMessage(socket, io)
+            this.chatEvents.sendGroupMessage(socket, io)
+            this.chatEvents.joinRoom(socket, io)
+        } catch (error) {
+            socket.emit("custum_error", error)
+        }
+    }
+
+}

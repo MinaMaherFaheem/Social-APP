@@ -6,11 +6,37 @@ import * as validators from './user.validation';
 import { TokenEnum } from "../../utils/security/token.security";
 import { cloudFileUpload, fileValidation, StorageEnum } from "../../utils/multer/cloud.multer";
 import { endpoint } from "./user.authorization";
+import { chatRouter } from "../chat";
 const router = Router();
+
+router.use("./:userId/chat", chatRouter)
 
 router.get("/",
   authentication(),
   userService.profile
+);
+
+router.get("/dashboard",
+  authorization(endpoint.dashboard),
+  userService.dashboard
+);
+
+router.post("/:userId/send-friend-request",
+  authentication(),
+  validation(validators.sendFriendRequest),
+  userService.sendFriendRequest
+);
+
+router.patch("/accept-friend-request/:requestId",
+  authentication(),
+  validation(validators.acceptFriendRequest),
+  userService.acceptFriendRequest
+);
+
+router.patch("/:userId/change-role",
+  authorization(endpoint.dashboard),
+  validation(validators.changeRole),
+  userService.changeRole
 );
 
 router.delete("/:userId/freeze-account",

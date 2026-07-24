@@ -13,13 +13,10 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 
 //Modules routing
-import authController from "./modules/auth/auth.controller"
-import userController from "./modules/user/user.controller"
-
+import { authRouter, initio, postRouter, schema, userRouter } from "./modules"
 
 //Utils
 import { BadRequestException, globalErrorHandlind } from './utils/response/error.reponse';
-
 
 //DB
 import connectDB from './DB/connection.database';
@@ -27,18 +24,20 @@ import connectDB from './DB/connection.database';
 import { promisify } from 'node:util';
 import { pipeline } from 'node:stream';
 import { createGetPresignedLink, getFile } from './utils/multer/s3.config';
+import { chatRouter } from './modules/chat';
+
+import { createHandler } from 'graphql-http/lib/use/express';
+import { authentication } from './middleware/authentication.middleware';
+
 
 const createS3WriteStreamPipe = promisify(pipeline);
 
-
-
-const limiter =rateLimit({
+const limiter = rateLimit({
   windowMs: 60 * 60000,
   limit: 2000,
   message: {error: "to many request please try again later"},
   statusCode: 429
 });
-
 
 
 // app-start-point
@@ -59,8 +58,15 @@ const bootstarp = async (): Promise<void> => {
   })
 
   //sub-app-routing-modules
-  app.use("/auth", authController);
-  app.use("/user", userController);
+  app.use("/auth", authRouter);
+  app.use("/user", userRouter);
+  app.use("/post", postRouter);
+  app.use("/chat", chatRouter);
+
+  app.all("/graphql",
+    authentication(),
+    createHandler({ schema: schema, context: (req) => ({ user: req.raw.user }) })
+  );
 
   app.get("/upload/*path", async(req: Request, res: Response):Promise<void> => {
     const {downloadName ,download="false" } = req.query as {
@@ -75,6 +81,7 @@ const bootstarp = async (): Promise<void> => {
       throw new BadRequestException("fail to fetch this asset");
     }
 
+    res.set("Corss-Origin-Resource-Policy", "corss-origin");
     res.setHeader("Content-type", `${s3Responce.ContentType || "application/octet-stream"}`);
 
     if (download === "true") {
@@ -109,9 +116,12 @@ const bootstarp = async (): Promise<void> => {
   await connectDB()
 
   //start server
-  app.listen(port, () => {
+  const httpServer = app.listen(port, () => {
     console.log(`Server is running on port :::${port}`);
   })
+
+  initio(httpServer)
+
 }
 
 export default bootstarp

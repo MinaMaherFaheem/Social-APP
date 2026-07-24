@@ -1,0 +1,6 @@
+export { router as authRouter } from "./auth";
+export { router as postRouter } from "./post";
+export { router as userRouter } from "./user";
+export * from "./graphql";
+export * from "./geteway";
+//# sourceMappingURL=index.d.ts.map

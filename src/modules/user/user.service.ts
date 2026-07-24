@@ -1,28 +1,209 @@
 import { Request, Response } from "express";
 import { UserRepository } from "../../DB/repository/user.repository";
-import { HUserDocument, IUser, RoleEnum, UserModel } from "../../models/user.model";
+import { GenderEnum, HUserDocument, RoleEnum, UserModel } from "../../models/user.model";
 import { IFreezeAccountDTO, IHardDeleteDTO, ILogoutDto, IRestoreAccountDTO } from "./user.dto";
 import { Types, UpdateQuery } from "mongoose";
 import { createLoginCredentials, createRevokeToken, LogoutEnum } from "../../utils/security/token.security";
 import { JwtPayload } from "jsonwebtoken";
 import { createPresignedUploadLink, deleteFiles, deleteFolderByPrefix, uploadFiles } from "../../utils/multer/s3.config";
 import { StorageEnum } from "../../utils/multer/cloud.multer";
-import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from "../../utils/response/error.reponse";
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from "../../utils/response/error.reponse";
 import { s3Event } from "../../utils/multer/s3.events";
 import { successResponse } from "../../utils/response/success.response";
-import { IUserResponse, IProfileImageResponse } from "./user.entities";
+import { IUserProfileResponse, IProfileImageResponse } from "./user.entities";
 import { ILoginResponse } from "../auth/auth.entities";
+import { ChatRepository, FriendRequestRepository, PostRepository } from "../../DB/repository";
+import { ChatModel, FriendRequestModel, PostModel } from "../../models";
+import { GraphQLError } from "graphql";
 
 
-class UserService {
+export interface IUser {
+  id: number;
+  name: string;
+  email: string;
+  gender: GenderEnum;
+  password: string;
+  followers: number[];
+}
+
+let users: IUser[] = [
+  {
+    id: 1,
+    name: "mina",
+    email: "mina@gmail.com",
+    gender: GenderEnum.male,
+    password: "12345",
+    followers: [],
+  },
+  {
+    id: 2,
+    name: "maher",
+    email: "maher@gmail.com",
+    gender: GenderEnum.male,
+    password: "112233",
+    followers: [],
+  },
+  {
+    id: 3,
+    name: "faheem",
+    email: "faheem@gmail.com",
+    gender: GenderEnum.male,
+    password: "112211",
+    followers: [],
+  },
+  {
+    id: 4,
+    name: "ayoub",
+    email: "ayoub@gmail.com",
+    gender: GenderEnum.male,
+    password: "232422",
+    followers: [],
+  },
+];
+
+
+export class UserService {
   private userModel = new UserRepository(UserModel);
+  private postModel = new PostRepository(PostModel);
+  private chatModel = new ChatRepository(ChatModel);
+  private friendRequestModel = new FriendRequestRepository(FriendRequestModel);
   constructor() {}
 
   profile = async (req: Request, res: Response): Promise<Response> => {
-    if (!req.user) {
-      throw new UnauthorizedException("missing user details")
+    const profile = await this.userModel.findById({
+      id: req.user?._id as Types.ObjectId,
+      options: {
+        populate: [
+          {
+            path: "friends",
+            select: "firstName lastName email gender profilePicture"
+          }
+        ]
+      }
+    });
+
+    if (!profile) {
+      throw new NotFoundException("fail to find user profile");
+    };
+
+    const groups = await this.chatModel.find({
+      filter: {
+        participants: { $in: req.user?._id }, 
+        group:{ $exists: true }
+      },
+    });
+    
+
+    return successResponse<IUserProfileResponse>({ res, data: { user: profile, groups } });
+  };
+
+  dashboard = async (req: Request, res: Response): Promise<Response> => {
+    const results = await Promise.allSettled([
+      this.userModel.find({filter: {}}),
+      this.postModel.find({filter: {}})
+    ]);
+
+    return successResponse({ res, data: { results } });
+  };
+
+  changeRole = async (req: Request, res: Response): Promise<Response> => {
+    const { userId } = req.params as unknown as { userId: Types.ObjectId };
+    const { role }:{ role: RoleEnum } = req.body
+    const denyRoles:RoleEnum[] = [ role, RoleEnum.superAdmin ];
+
+    if (req.user?.role === RoleEnum.admin) {
+      denyRoles.push(RoleEnum.admin)
     }
-    return successResponse<IUserResponse>({ res, data: { user: req.user } });
+
+    const user = await this.userModel.findOneAndUpdate({
+      filter: {
+        _id: userId as Types.ObjectId,
+        role: { $nin: denyRoles }
+      },
+      update: {
+        role
+      }
+    });
+
+    if (!user) {
+      throw new NotFoundException("fail to find matching result");
+    };
+
+    return successResponse({ res });
+  };
+
+  sendFriendRequest = async (req: Request, res: Response): Promise<Response> => {
+    const { userId } = req.params as unknown as { userId: Types.ObjectId };
+    const checkFriendRequestExist = await this.friendRequestModel.findOne({
+      filter: {
+        createdBy: { $in: [req.user?._id, userId] },
+        sendTo: { $in: [req.user?._id, userId] }
+      }
+    });
+
+    if (checkFriendRequestExist) {
+      throw new ConflictException("Friend request already exist");
+    }
+
+    const user = await this.userModel.findOne({
+      filter: {
+        _id: userId
+      }
+    });
+
+    if (!user) {
+      throw new NotFoundException("Invalid recipient");
+    }
+
+    const [friendRequest] = (await this.friendRequestModel.create({
+      data: [
+        {
+        createdBy: req.user?._id as Types.ObjectId,
+        sendTo: userId
+        }
+      ]
+    })) || [];
+
+    if (!friendRequest) {
+      throw new BadRequestException("something went wrong!!!");
+    }
+    
+    return successResponse({ res, statusCode: 201 });
+  };
+
+  acceptFriendRequest = async (req: Request, res: Response): Promise<Response> => {
+    const { requestId } = req.params as unknown as { requestId: Types.ObjectId };
+    const friendRequest = await this.friendRequestModel.findOneAndUpdate({
+      filter: {
+        _id: requestId,
+        sendTo: req.user?._id,
+        acceptedAt: { $exists: false }
+      },
+      update: {
+        acceptedAt: new Date()
+      }
+    });
+
+    if (!friendRequest) {
+      throw new NotFoundException("Fail to found matching result");
+    };
+
+    await Promise.all([
+      await this.userModel.updateOne({
+        filter: { _id: friendRequest.createdBy },
+        update: {
+          $addToSet: { friends: friendRequest.sendTo }
+        }
+      }),
+      await this.userModel.updateOne({
+        filter: { _id: friendRequest.sendTo },
+        update: {
+          $addToSet: { friends: friendRequest.createdBy }
+        }
+      })
+    ])
+
+    return successResponse({ res });
   };
 
   profileImage = async (req: Request, res: Response): Promise<Response> => {
@@ -84,7 +265,7 @@ class UserService {
       await deleteFiles({ urls: req.user.coverImages });
     };
 
-    return successResponse<IUserResponse>({ res, data: { user } });
+    return successResponse<IUserProfileResponse>({ res, data: { user } });
   };
 
   freezeAccount = async (req: Request, res: Response): Promise<Response> => {
@@ -203,6 +384,41 @@ class UserService {
     await createRevokeToken(req.decoded as JwtPayload);
 
     return successResponse<ILoginResponse>({ res, statusCode: 201, data: { credentials } });
+  };
+
+  //#GRAPHQL#
+
+  welcome = (user: HUserDocument): string => {
+    return "Hello graphql";
+  };
+
+  allUsers = async (args: { gender: GenderEnum }, authUser:HUserDocument): Promise<HUserDocument[]> => {
+    return await this.userModel.find({
+      filter: {
+        _id: {$ne: authUser._id},
+        gender: args.gender
+      }
+    });
+  }
+
+  search = (args: { email: string }): { message: string;  statusCode:number; data: IUser} => {
+    const user = users.find((ele) => ele.email === args.email);
+    if (!user) {
+      throw new GraphQLError("fail to find matching result", {
+        extensions: { statusCode: 404 },
+      });
+    }
+    return { message: "Done", statusCode: 200, data: user };
+  };
+
+  addFollower = (args: { friendId: number; myId: number }): IUser[] => {
+    users = users.map((ele: IUser): IUser => {
+      if (ele.id === args.friendId) {
+        ele.followers.push(args.myId)
+      }
+      return ele;
+    });
+    return users;
   };
 
 }
